@@ -1,6 +1,6 @@
 package Tie::Mounted;
 
-$VERSION = '0.02';
+$VERSION = '0.03';
 
 use strict 'vars';
 use vars qw(
@@ -9,17 +9,17 @@ use vars qw(
     $Only
 );
 use base qw(Tie::Array);
-use Carp qw(carp croak);
+use Carp 'croak';
 
 $MOUNT_BIN  = '/sbin/mount';
 $UMOUNT_BIN = '/sbin/umount';
 
 sub _private {
     my $APPROVE = 1;
-    my @NODES   = qw( );
+    my @NODES   = qw(  );
     
  
-    return _localcall(1,56,57) 
+    return _localcall(1,54,56) 
       ? eval do { $_[0] } : '';     
 }
 
@@ -28,15 +28,14 @@ sub TIEARRAY {
     return bless &_tie, $class;
 }
 
-sub FETCHSIZE { (scalar @{$_[0]} - 1) }
+# This is tricky since FETCHSIZE expects
+# the ``proper" array size. Its $# due
+# to the hidden node.
+sub FETCHSIZE { $#{$_[0]} }
+sub FETCH     { $_[0]->[++$_[1]] }
 
-sub FETCH { 
-    my($self, $i) = @_;
-    return $self->[++$i];
-}
-
-*STORESIZE = \&_carp;
-*STORE     = \&_carp;
+*STORESIZE = \&_croak;
+*STORE     = \&_croak;
 
 sub UNTIE { &_approve('umount', $_[0]->[0]) }
 
@@ -44,24 +43,23 @@ sub _tie {
     my $node = pop;
     _approve('mount', $node, grep !/^-(?:a|A|d)$/, @_);
     my $items = []; $items = _read_dir($node) if !$Only;
-    # Store node at index 0
+    # Invisible node at index 0
     unshift @$items, $node;    
     return $items;
 }
 
 sub _approve {
     my $sub = shift;
-    my $approved;
     croak 'No valid node supplied' if !-d $_[0];
     if (_private('$APPROVE')) { 
-        $approved = grep { $_[0] eq $_ } _private('@NODES');
-	croak "Attempt to $sub unapproved node" if $approved == 0; 
+	croak "Attempt to $sub unapproved node" 
+	  unless (grep { $_[0] eq $_ } _private('@NODES')); 
     }
     &{"_$sub"};
 }
   
 sub _mount {
-    die '_mount is private' unless _localcall(1,60);
+    die '_mount is private' unless _localcall(1,58);
     my $node = shift;
     unless(_is_mounted($node)) {
         my $cmd = "$MOUNT_BIN @_ $node";
@@ -73,10 +71,10 @@ sub _is_mounted {
     my $node = shift;
     open PIPE, "$MOUNT_BIN |" 
       or die "Couldn't init pipe to $MOUNT_BIN: $!";
-    for (<PIPE>) { return 1 if /$node/ }
+    my $ret = (grep /$node/, <PIPE>) ? 1 : 0;
     close PIPE 
       or die "Couldn't drop pipe to $MOUNT_BIN: $!";
-    return 0;
+    return $ret;
 }
 
 sub _read_dir {
@@ -90,20 +88,21 @@ sub _read_dir {
 }
 
 sub _umount {
-    die '_umount is private' unless _localcall(1,60);
+    die '_umount is private' unless _localcall(1,58);
     my $node = shift;
     my $cmd = "$UMOUNT_BIN $node";
     system($cmd) == 0 or die "\n$cmd: $!";
 }
 
 sub _localcall {
-    my @called = caller(shift);
-    return 0 if $called[0] ne __PACKAGE__;
-    for (@_) { return 1 if $called[2] == $_ }
-    return 0;
+    my @called = (caller(shift))[0,2];
+    return $called[0] ne __PACKAGE__ 
+      ? 0
+      : (grep { $called[1] == $_ } @_)
+        ? 1 : 0;
 }
 
-sub _carp { carp 'Tied array is read-only' }
+sub _croak { croak 'Tied array is read-only' }
 
 1;
 __END__
@@ -125,7 +124,9 @@ Tie::Mounted - Tie a mounted node to an array
 This module ties files of a mount point to an array by invoking
 the system commands C<mount> and C<umount>; C<mount> is invoked
 when a former attempt to tie an array is being committed,
-C<umount> when a tied array is to be untied.
+C<umount> when a tied array is to be untied. Suitability 
+is therefore limited and suggests a rarely used node (such as
+F</backup>).
 
 The mandatory parameter consists of the node (or: I<mount point>)
 to be mounted (F</backup> - as declared in F</etc/fstab>); 
