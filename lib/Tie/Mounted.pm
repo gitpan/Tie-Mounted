@@ -1,6 +1,6 @@
 package Tie::Mounted;
 
-$VERSION = '0.1';
+$VERSION = '0.11';
 
 use strict 'vars';
 use vars qw(
@@ -28,11 +28,11 @@ sub _private {
 
 {
     sub TIEARRAY {
-        my $pkg = shift;
+        (undef) = shift;
 	
 	_validate_node( $_[0] );
 	
-        return bless( &_tie, $pkg );
+        return bless &_tie;
     }
 
     sub FETCHSIZE { $#{$_[0]} }           # FETCHSIZE, FETCH: Due to the node, 
@@ -47,11 +47,10 @@ sub _private {
 sub _validate_node {
     my ($node) = @_;
     
-    local (*F_TABS, $/); 
-    $/ = '';
+    local *F_TABS; 
     
     open F_TABS, "<$FSTAB" or die "Couldn't open $FSTAB: $!";
-    my $fstabs = <F_TABS>;
+    my $fstabs = do { local $/ = ''; <F_TABS> };
     close F_TABS or die "Couldn't close $FSTAB: $!";
     
     !$node
@@ -93,7 +92,7 @@ sub _approve {
 }
       
 sub _mount {
-    die '_mount is private' unless _localcall( 1,92 );
+    die '_mount is private' unless _localcall( 1,91 );
     
     my $node = shift;
     
@@ -135,7 +134,7 @@ sub _read_dir {
 }
 
 sub _umount {
-    die '_umount is private' unless _localcall( 1,92 );
+    die '_umount is private' unless _localcall( 1,91 );
     
     my ($node) = @_;
     
