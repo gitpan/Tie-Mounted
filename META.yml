@@ -1,0 +1,10 @@
+--- #YAML:1.0
+module_name: Tie-Mounted
+dist_version_from: lib/Tie/Mounted.pm
+installdirs: site
+requires:
+    Tie::Array: 0 
+distribution_type: module
+license: perl
+dist_abstract: Tie a mounted node to an array
+dist_author: Steven Schubiger
