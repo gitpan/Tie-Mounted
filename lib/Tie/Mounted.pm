@@ -1,6 +1,6 @@
 package Tie::Mounted;
 
-$VERSION = '0.06';
+$VERSION = '0.07';
 
 use strict 'vars';
 use vars qw(
@@ -29,14 +29,14 @@ sub _private {
         return bless &_tie, $class;
     }
 
-    # This is tricky since FETCHSIZE expects
-    # the ``proper" array size. Its $# due
-    # to the hidden node that is left out.
+    # FETCHSIZE, FETCH: Due to the node, 
+    # which is being kept hideously, accordingly 
+    # subtract (FETCHSIZE) or add (FETCH) 1. 
     sub FETCHSIZE { $#{$_[0]} }
     sub FETCH     { $_[0]->[++$_[1]] }
 
-    *STORESIZE = \&_croak;
-    *STORE     = \&_croak;
+    *STORESIZE = *STORE = 
+      sub { croak 'Tied array is read-only' };
 
     sub UNTIE { &_approve('umount', $_[0]->[0]) }
 }
@@ -44,8 +44,10 @@ sub _private {
 sub _tie {
     my $node = shift;
     _approve('mount', $node, grep !/^-(?:a|A|d)$/, @_);
+    
     my $items = []; 
     $items = _read_dir($node) if !$No_files;
+    
     # Invisible node at index 0
     unshift @$items, $node;    
     return $items;
@@ -53,16 +55,19 @@ sub _tie {
 
 sub _approve {
     my $sub = shift;
+    
     croak 'No valid node supplied' if !-d $_[0];
     if (_private('$APPROVE')) { 
 	croak "Attempt to $sub unapproved node" 
 	  unless (grep { $_[0] eq $_ } _private('@NODES')); 
     }
+    
     &{"_$sub"};
 }
   
 sub _mount {
-    die '_mount is private' unless _localcall(1,61);
+    die '_mount is private' unless _localcall(1,65);
+    
     my $node = shift;
     if (!_is_mounted($node)) {
         my $cmd = "$MOUNT_BIN @_ $node";
@@ -72,26 +77,31 @@ sub _mount {
 
 sub _is_mounted {
     my $node = shift;
+    
     open PIPE, "$MOUNT_BIN |" 
       or die "Couldn't init pipe to $MOUNT_BIN: $!";
     my $ret = (grep /$node/, <PIPE>) ? 1 : 0;
     close PIPE 
       or die "Couldn't drop pipe to $MOUNT_BIN: $!";
+      
     return $ret;
 }
 
 sub _read_dir {
     my $node = shift;
+    
     local *DIR;
     opendir DIR, $node
       or die "Couldn't init access to $node: $!";
     my @items = sort readdir DIR; splice(@items, 0, 2);
     closedir DIR or die "Couldn't drop access to $node: $!";
+    
     return \@items;
 }
 
 sub _umount {
-    die '_umount is private' unless _localcall(1,61);
+    die '_umount is private' unless _localcall(1,65);
+    
     my $node = shift;
     my $cmd = "$UMOUNT_BIN $node";
     system($cmd) == 0 or exit 1;
@@ -104,8 +114,6 @@ sub _localcall {
       : (grep { $called[1] == $_ } @_)
         ? 1 : 0;
 }
-
-sub _croak { croak 'Tied array is read-only' }
 
 1;
 __END__
@@ -173,8 +181,8 @@ Files within the tied array are statically tied.
 
 =head2 Internals
 
-Do not modify guts unless you adjust the parameters
-of _localcall().
+It is not recommended to modify internals unless the parameters
+to _localcall() are being adjusted accordingly.
 
 =head1 SEE ALSO
 
