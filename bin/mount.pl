@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl
+#! /usr/local/bin/perl
 
 use strict;
 use warnings;
@@ -9,6 +9,8 @@ use Tie::Mounted;
 my $node = '';
 
 tie my @files, 'Tie::Mounted', $node, '-v';
-$, = "\n";
-print @files; print "\n";
+{
+    local $, = "\n";
+    print @files; print "\n";
+}    
 untie @files;

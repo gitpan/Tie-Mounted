@@ -1,6 +1,6 @@
 package Tie::Mounted;
 
-$VERSION = '0.08';
+$VERSION = '0.09';
 
 use strict 'vars';
 use vars qw(
@@ -49,7 +49,9 @@ sub _private {
 sub _validate_node {
     my($node) = @_;
     
-    local (*F_TABS, $/); $/ = '';
+    local (*F_TABS, $/); 
+    $/ = '';
+    
     open F_TABS, "<$FSTAB" or die "Couldn't open $FSTAB: $!";
     my $fstabs = <F_TABS>;
     close F_TABS or die "Couldn't close $FSTAB: $!";
@@ -67,13 +69,16 @@ sub _validate_node {
 
 sub _tie {
     my $node = shift;
-    _approve('mount', $node, grep !/^-(?:a|A|d)$/, @_);
     
-    my $items = []; 
-    $items = _read_dir($node) unless $No_files;
+    _approve('mount', $node, grep !/^-(?: a|A|d)$/ox, @_);
+    
+    my $items = $No_files
+      ? []
+      : _read_dir($node); 
     
     # Invisible node at index 0
-    unshift @$items, $node;    
+    unshift @$items, $node;
+        
     return $items;
 }
 
@@ -89,9 +94,10 @@ sub _approve {
 }
       
 sub _mount {
-    die '_mount is private' unless _localcall(1,88);
+    die '_mount is private' unless _localcall(1,93);
     
     my $node = shift;
+    
     unless (_is_mounted($node)) {
         my $cmd = "$MOUNT_BIN @_ $node";
         system($cmd) == 0 or exit 1;
@@ -114,6 +120,7 @@ sub _read_dir {
     my($node) = @_;
     
     local *DIR;
+    
     opendir DIR, $node
       or die "Couldn't init access to $node: $!";
     my @items = sort readdir DIR; splice(@items, 0, 2);
@@ -123,15 +130,17 @@ sub _read_dir {
 }
 
 sub _umount {
-    die '_umount is private' unless _localcall(1,88);
+    die '_umount is private' unless _localcall(1,93);
     
     my($node) = @_;
+    
     my $cmd = "$UMOUNT_BIN $node";
     system($cmd) == 0 or exit 1;
 }
 
 sub _localcall {
     my @called = (caller(shift))[0,2];
+    
     return $called[0] ne __PACKAGE__ 
       ? 0
       : (grep { $called[1] == $_ } @_)
