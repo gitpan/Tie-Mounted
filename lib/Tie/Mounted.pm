@@ -1,13 +1,13 @@
 package Tie::Mounted;
 
-$VERSION = '0.13';
+$VERSION = '0.14';
 
 use strict 'vars';
 use vars qw(
     $FSTAB
     $MOUNT_BIN 
     $UMOUNT_BIN
-    $No_files
+    $NO_FILES
 );
 use base qw(Tie::Array);
 use Carp 'croak';
@@ -30,7 +30,7 @@ sub _private {
     sub TIEARRAY {
         (undef) = shift;
 	
-	_validate_node( $_[0] );
+	_validate_node($_[0]);
 	
         return bless &_tie;
     }
@@ -41,7 +41,7 @@ sub _private {
     *STORESIZE = *STORE = 
       sub { croak 'Tied array is read-only' };
 
-    sub UNTIE { _approve( 'umount', $_[0]->[0] ) }
+    sub UNTIE { _approve('umount', $_[0]->[0]) }
 }
 
 sub _validate_node {
@@ -68,11 +68,11 @@ sub _tie {
     my $node = shift;
     my @args = split /\s+/, $_[0];
     
-    _approve( 'mount', $node, grep !/^-[aAd]$/o, @args );
+    _approve('mount', $node, grep !/^-[aAd]$/o, @args);
     
-    my $items = $No_files
+    my $items = $NO_FILES
       ? []
-      : _read_dir( $node ); 
+      : _read_dir($node); 
     
     # Invisible node at index 0
     unshift @$items, $node;
@@ -83,22 +83,22 @@ sub _tie {
 sub _approve {
     my ($sub, $node) = (shift, @_);
     
-    if (_private( '$APPROVE' )) { 
+    if (_private('$APPROVE')) { 
 	croak "Attempt to $sub unapproved node" 
-	  unless (grep { $node eq $_ } _private( '@NODES' )); 
+	  unless (grep { $node eq $_ } _private('@NODES')); 
     }
     
     &{"_$sub"};
 }
       
 sub _mount {
-    die '_mount is private' unless _localcall( 1,91 );
+    die '_mount is private' unless _localcall(1,91);
     
     my $node = shift;
     
-    unless (_is_mounted( $node )) {
+    unless (_is_mounted($node)) {
         my $cmd = "$MOUNT_BIN @_ $node";
-        system( $cmd ) == 0 or exit 1;
+        system $cmd == 0 or exit 1;
     }
 }
 
@@ -125,7 +125,7 @@ sub _read_dir {
       or die "Couldn't init access to $node: $!";
       
     my @items = sort (readdir DIR); 
-    splice( @items, 0, 2 );
+    splice(@items, 0, 2);
     
     closedir DIR
       or die "Couldn't drop access to $node: $!";
@@ -134,16 +134,16 @@ sub _read_dir {
 }
 
 sub _umount {
-    die '_umount is private' unless _localcall( 1,91 );
+    die '_umount is private' unless _localcall(1,91);
     
     my ($node) = @_;
     
     my $cmd = "$UMOUNT_BIN $node";
-    system( $cmd ) == 0 or exit 1;
+    system $cmd == 0 or exit 1;
 }
 
 sub _localcall {
-    my @called = (caller( shift ))[0,2];
+    my @called = (caller(shift))[0,2];
     
     return $called[0] ne __PACKAGE__ 
       ? 0
@@ -185,7 +185,7 @@ Default paths to C<mount> and C<umount> may be overriden
 by setting accordingly either $Tie::Mounted::MOUNT_BIN or 
 $Tie::Mounted::UMOUNT_BIN.
 
-If $Tie::Mounted::No_files is set to a true value, 
+If $Tie::Mounted::NO_FILES is set to a true value, 
 a bogus array with zero files will be tied.
 
 =head1 CAVEATS

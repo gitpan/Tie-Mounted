@@ -1,9 +1,11 @@
---- #YAML:1.0
-module_name: Tie-Mounted
-dist_version_from: lib/Tie/Mounted.pm
-installdirs: site
+# http://module-build.sourceforge.net/META-spec.html
+#XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
+name:         Tie-Mounted
+version:      0.14
+version_from: lib/Tie/Mounted.pm
+installdirs:  site
 requires:
-    Tie::Array: 0 
+    Tie::Array:                    0
+
 distribution_type: module
-license: perl
-dist_abstract: Tie a mounted node to an array
+generated_by: ExtUtils::MakeMaker version 6.17
