@@ -1,9 +1,10 @@
 package Tie::Mounted;
 
-$VERSION = '0.07';
+$VERSION = '0.08';
 
 use strict 'vars';
 use vars qw(
+    $FSTAB
     $MOUNT_BIN 
     $UMOUNT_BIN
     $No_files
@@ -11,6 +12,7 @@ use vars qw(
 use base qw(Tie::Array);
 use Carp 'croak';
 
+$FSTAB      = '/etc/fstab';
 $MOUNT_BIN  = '/sbin/mount';
 $UMOUNT_BIN = '/sbin/umount';
 
@@ -26,6 +28,9 @@ sub _private {
 {
     sub TIEARRAY {
         my $class = shift;
+	
+	_validate_node($_[0]);
+	
         return bless &_tie, $class;
     }
 
@@ -38,7 +43,26 @@ sub _private {
     *STORESIZE = *STORE = 
       sub { croak 'Tied array is read-only' };
 
-    sub UNTIE { &_approve('umount', $_[0]->[0]) }
+    sub UNTIE { _approve('umount', $_[0]->[0]) }
+}
+
+sub _validate_node {
+    my($node) = @_;
+    
+    local (*F_TABS, $/); $/ = '';
+    open F_TABS, "<$FSTAB" or die "Couldn't open $FSTAB: $!";
+    my $fstabs = <F_TABS>;
+    close F_TABS or die "Couldn't close $FSTAB: $!";
+    
+    !$node
+      ? croak 'No node supplied'
+      : !-d $node
+        ? croak "$node doesn't exist"
+        : $fstabs =~ /^#.*$node/m
+          ? croak "$node is enlisted as disabled in $FSTAB"
+	  : $fstabs !~ /$node/s
+	    ? croak "$node is not enlisted in $FSTAB"
+	    : '';
 }
 
 sub _tie {
@@ -46,7 +70,7 @@ sub _tie {
     _approve('mount', $node, grep !/^-(?:a|A|d)$/, @_);
     
     my $items = []; 
-    $items = _read_dir($node) if !$No_files;
+    $items = _read_dir($node) unless $No_files;
     
     # Invisible node at index 0
     unshift @$items, $node;    
@@ -54,29 +78,28 @@ sub _tie {
 }
 
 sub _approve {
-    my $sub = shift;
+    my($sub, $node) = (shift, @_);
     
-    croak 'No valid node supplied' if !-d $_[0];
     if (_private('$APPROVE')) { 
 	croak "Attempt to $sub unapproved node" 
-	  unless (grep { $_[0] eq $_ } _private('@NODES')); 
+	  unless (grep { $node eq $_ } _private('@NODES')); 
     }
     
     &{"_$sub"};
 }
-  
+      
 sub _mount {
-    die '_mount is private' unless _localcall(1,65);
+    die '_mount is private' unless _localcall(1,88);
     
     my $node = shift;
-    if (!_is_mounted($node)) {
+    unless (_is_mounted($node)) {
         my $cmd = "$MOUNT_BIN @_ $node";
         system($cmd) == 0 or exit 1;
     }
 }
 
 sub _is_mounted {
-    my $node = shift;
+    my($node) = @_;
     
     open PIPE, "$MOUNT_BIN |" 
       or die "Couldn't init pipe to $MOUNT_BIN: $!";
@@ -88,7 +111,7 @@ sub _is_mounted {
 }
 
 sub _read_dir {
-    my $node = shift;
+    my($node) = @_;
     
     local *DIR;
     opendir DIR, $node
@@ -100,9 +123,9 @@ sub _read_dir {
 }
 
 sub _umount {
-    die '_umount is private' unless _localcall(1,65);
+    die '_umount is private' unless _localcall(1,88);
     
-    my $node = shift;
+    my($node) = @_;
     my $cmd = "$UMOUNT_BIN $node";
     system($cmd) == 0 or exit 1;
 }
