@@ -1,6 +1,6 @@
 package Tie::Mounted;
 
-$VERSION = '0.09';
+$VERSION = '0.1';
 
 use strict 'vars';
 use vars qw(
@@ -11,6 +11,7 @@ use vars qw(
 );
 use base qw(Tie::Array);
 use Carp 'croak';
+
 
 $FSTAB      = '/etc/fstab';
 $MOUNT_BIN  = '/sbin/mount';
@@ -27,27 +28,24 @@ sub _private {
 
 {
     sub TIEARRAY {
-        my $class = shift;
+        my $pkg = shift;
 	
-	_validate_node($_[0]);
+	_validate_node( $_[0] );
 	
-        return bless &_tie, $class;
+        return bless( &_tie, $pkg );
     }
 
-    # FETCHSIZE, FETCH: Due to the node, 
-    # which is being kept hideously, accordingly 
-    # subtract (FETCHSIZE) or add (FETCH) 1. 
-    sub FETCHSIZE { $#{$_[0]} }
-    sub FETCH     { $_[0]->[++$_[1]] }
-
+    sub FETCHSIZE { $#{$_[0]} }           # FETCHSIZE, FETCH: Due to the node, 
+    sub FETCH     { $_[0]->[++$_[1]] }    # which is being kept hideously, accordingly  
+                                          # subtract (FETCHSIZE) or add (FETCH) 1.    
     *STORESIZE = *STORE = 
       sub { croak 'Tied array is read-only' };
 
-    sub UNTIE { _approve('umount', $_[0]->[0]) }
+    sub UNTIE { _approve( 'umount', $_[0]->[0] ) }
 }
 
 sub _validate_node {
-    my($node) = @_;
+    my ($node) = @_;
     
     local (*F_TABS, $/); 
     $/ = '';
@@ -60,7 +58,7 @@ sub _validate_node {
       ? croak 'No node supplied'
       : !-d $node
         ? croak "$node doesn't exist"
-        : $fstabs =~ /^#.*$node/m
+        : $fstabs =~ /^\#.*$node/m
           ? croak "$node is enlisted as disabled in $FSTAB"
 	  : $fstabs !~ /$node/s
 	    ? croak "$node is not enlisted in $FSTAB"
@@ -69,12 +67,13 @@ sub _validate_node {
 
 sub _tie {
     my $node = shift;
+    my @args = split /\s+/, $_[0];
     
-    _approve('mount', $node, grep !/^-(?: a|A|d)$/ox, @_);
+    _approve( 'mount', $node, grep !/^-[aAd]$/o, @args );
     
     my $items = $No_files
       ? []
-      : _read_dir($node); 
+      : _read_dir( $node ); 
     
     # Invisible node at index 0
     unshift @$items, $node;
@@ -83,33 +82,35 @@ sub _tie {
 }
 
 sub _approve {
-    my($sub, $node) = (shift, @_);
+    my ($sub, $node) = (shift, @_);
     
-    if (_private('$APPROVE')) { 
+    if (_private( '$APPROVE' )) { 
 	croak "Attempt to $sub unapproved node" 
-	  unless (grep { $node eq $_ } _private('@NODES')); 
+	  unless (grep { $node eq $_ } _private( '@NODES' )); 
     }
     
     &{"_$sub"};
 }
       
 sub _mount {
-    die '_mount is private' unless _localcall(1,93);
+    die '_mount is private' unless _localcall( 1,92 );
     
     my $node = shift;
     
-    unless (_is_mounted($node)) {
+    unless (_is_mounted( $node )) {
         my $cmd = "$MOUNT_BIN @_ $node";
-        system($cmd) == 0 or exit 1;
+        system( $cmd ) == 0 or exit 1;
     }
 }
 
 sub _is_mounted {
-    my($node) = @_;
+    my ($node) = @_;
     
     open PIPE, "$MOUNT_BIN |" 
       or die "Couldn't init pipe to $MOUNT_BIN: $!";
+      
     my $ret = (grep /$node/, <PIPE>) ? 1 : 0;
+    
     close PIPE 
       or die "Couldn't drop pipe to $MOUNT_BIN: $!";
       
@@ -117,29 +118,33 @@ sub _is_mounted {
 }
 
 sub _read_dir {
-    my($node) = @_;
+    my ($node) = @_;
     
     local *DIR;
     
     opendir DIR, $node
       or die "Couldn't init access to $node: $!";
-    my @items = sort readdir DIR; splice(@items, 0, 2);
-    closedir DIR or die "Couldn't drop access to $node: $!";
+      
+    my @items = sort (readdir DIR); 
+    splice( @items, 0, 2 );
+    
+    closedir DIR
+      or die "Couldn't drop access to $node: $!";
     
     return \@items;
 }
 
 sub _umount {
-    die '_umount is private' unless _localcall(1,93);
+    die '_umount is private' unless _localcall( 1,92 );
     
-    my($node) = @_;
+    my ($node) = @_;
     
     my $cmd = "$UMOUNT_BIN $node";
-    system($cmd) == 0 or exit 1;
+    system( $cmd ) == 0 or exit 1;
 }
 
 sub _localcall {
-    my @called = (caller(shift))[0,2];
+    my @called = (caller( shift ))[0,2];
     
     return $called[0] ne __PACKAGE__ 
       ? 0
