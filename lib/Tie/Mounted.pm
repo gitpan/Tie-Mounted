@@ -1,6 +1,6 @@
 package Tie::Mounted;
 
-$VERSION = '0.04';
+$VERSION = '0.05';
 
 use strict 'vars';
 use vars qw(
@@ -14,6 +14,7 @@ use Carp 'croak';
 $MOUNT_BIN  = '/sbin/mount';
 $UMOUNT_BIN = '/sbin/umount';
 
+
 sub _private {
     my $APPROVE = 1;
     my @NODES   = qw(  );
@@ -22,26 +23,29 @@ sub _private {
     return eval do { $_[0] };     
 }
 
-sub TIEARRAY {
-    my $class = shift;
-    return bless &_tie, $class;
+{
+    sub TIEARRAY {
+        my $class = shift;
+        return bless &_tie, $class;
+    }
+
+    # This is tricky since FETCHSIZE expects
+    # the ``proper" array size. Its $# due
+    # to the hidden node.
+    sub FETCHSIZE { $#{$_[0]} }
+    sub FETCH     { $_[0]->[++$_[1]] }
+
+    *STORESIZE = \&_croak;
+    *STORE     = \&_croak;
+
+    sub UNTIE { &_approve('umount', $_[0]->[0]) }
 }
-
-# This is tricky since FETCHSIZE expects
-# the ``proper" array size. Its $# due
-# to the hidden node.
-sub FETCHSIZE { $#{$_[0]} }
-sub FETCH     { $_[0]->[++$_[1]] }
-
-*STORESIZE = \&_croak;
-*STORE     = \&_croak;
-
-sub UNTIE { &_approve('umount', $_[0]->[0]) }
 
 sub _tie {
     my $node = shift;
     _approve('mount', $node, grep !/^-(?:a|A|d)$/, @_);
-    my $items = []; $items = _read_dir($node) if !$No_files;
+    my $items = []; 
+    $items = _read_dir($node) if !$No_files;
     # Invisible node at index 0
     unshift @$items, $node;    
     return $items;
@@ -58,7 +62,7 @@ sub _approve {
 }
   
 sub _mount {
-    die '_mount is private' unless _localcall(1,57);
+    die '_mount is private' unless _localcall(1,59);
     my $node = shift;
     if (!_is_mounted($node)) {
         my $cmd = "$MOUNT_BIN @_ $node";
@@ -87,7 +91,7 @@ sub _read_dir {
 }
 
 sub _umount {
-    die '_umount is private' unless _localcall(1,57);
+    die '_umount is private' unless _localcall(1,59);
     my $node = shift;
     my $cmd = "$UMOUNT_BIN $node";
     system($cmd) == 0 or exit 1;
@@ -132,6 +136,10 @@ to be mounted (F</backup> - as declared in F</etc/fstab>);
 optional options to C<mount> may be subsequently passed (-v).
 Device names and mount options (-a,-A,-d) will be discarded
 in regard of system security.
+
+Paths to C<mount> and C<umount> may be overriden by setting
+accordingly either $Tie::Mounted::MOUNT_BIN or 
+$Tie::Mounted::UMOUNT_BIN.
 
 If $Tie::Mounted::No_files is set to a true value, a bogus array 
 with zero files will be tied.
