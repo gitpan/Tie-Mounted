@@ -4,11 +4,11 @@ use strict;
 use warnings;
 use Tie::Mounted;
 
-#$Tie::Mounted::Only = 1;
+#$Tie::Mounted::No_files = 1;
 
 my $node = '';
 
-tie my @mounted, 'Tie::Mounted', '-v', $node;
-local $, = "\n";
+tie my @mounted, 'Tie::Mounted', $node, '-v';
+$, = "\n";
 print @mounted; print "\n";
 untie @mounted;

@@ -1,12 +1,12 @@
 package Tie::Mounted;
 
-$VERSION = '0.03';
+$VERSION = '0.04';
 
 use strict 'vars';
 use vars qw(
     $MOUNT_BIN 
     $UMOUNT_BIN
-    $Only
+    $No_files
 );
 use base qw(Tie::Array);
 use Carp 'croak';
@@ -19,8 +19,7 @@ sub _private {
     my @NODES   = qw(  );
     
  
-    return _localcall(1,54,56) 
-      ? eval do { $_[0] } : '';     
+    return eval do { $_[0] };     
 }
 
 sub TIEARRAY {
@@ -40,9 +39,9 @@ sub FETCH     { $_[0]->[++$_[1]] }
 sub UNTIE { &_approve('umount', $_[0]->[0]) }
 
 sub _tie {
-    my $node = pop;
+    my $node = shift;
     _approve('mount', $node, grep !/^-(?:a|A|d)$/, @_);
-    my $items = []; $items = _read_dir($node) if !$Only;
+    my $items = []; $items = _read_dir($node) if !$No_files;
     # Invisible node at index 0
     unshift @$items, $node;    
     return $items;
@@ -59,11 +58,11 @@ sub _approve {
 }
   
 sub _mount {
-    die '_mount is private' unless _localcall(1,58);
+    die '_mount is private' unless _localcall(1,57);
     my $node = shift;
-    unless(_is_mounted($node)) {
+    if (!_is_mounted($node)) {
         my $cmd = "$MOUNT_BIN @_ $node";
-        system($cmd) == 0 or die "$cmd: $!";
+        system($cmd) == 0 or exit 1;
     }
 }
 
@@ -88,10 +87,10 @@ sub _read_dir {
 }
 
 sub _umount {
-    die '_umount is private' unless _localcall(1,58);
+    die '_umount is private' unless _localcall(1,57);
     my $node = shift;
     my $cmd = "$UMOUNT_BIN $node";
-    system($cmd) == 0 or die "\n$cmd: $!";
+    system($cmd) == 0 or exit 1;
 }
 
 sub _localcall {
@@ -115,7 +114,7 @@ Tie::Mounted - Tie a mounted node to an array
 
  require Tie::Mounted;
 
- tie @items, 'Tie::Mounted', '-v', '/backup';
+ tie @items, 'Tie::Mounted', '/backup', '-v';
  print $items[-1];
  untie @items;
 
@@ -130,12 +129,12 @@ F</backup>).
 
 The mandatory parameter consists of the node (or: I<mount point>)
 to be mounted (F</backup> - as declared in F</etc/fstab>); 
-optional options to C<mount> may be preceedingly passed (-v).
+optional options to C<mount> may be subsequently passed (-v).
 Device names and mount options (-a,-A,-d) will be discarded
 in regard of system security.
 
-If $Tie::Mounted::Only is set to a true value, a bogus array with
-zero files will be tied.
+If $Tie::Mounted::No_files is set to a true value, a bogus array 
+with zero files will be tied.
 
 =head1 CAVEATS
 
@@ -149,22 +148,18 @@ If in approval mode and a node is passed that is considered
 unapproved, Tie::Mounted will throw an exception.
 
 Such ``security" is rather trivial; instead it is recommended 
-to adjust the filesystem permissions of the module file to prevent 
-malicious use.
+to adjust filesystem permissions to prevent malicious use.
 
 =head2 Portability
 
-It is doubted that it will work not reliably on a non-(Open)BSD 
+It is doubted that it will work reliably on a non-(Open)BSD 
 system due to the fact that a pipe to mount has to be established to 
-ensure that a node is not already being mounted; which in return
-requires a parameter to be passed to mount which widely varies 
-on BSD systems.
+ensure that a node is not already being mounted; which requires a 
+parameter to be passed that widely varies on common Unix systems.
 
 =head2 Miscellanea
 
-The tied array may not be altered by C<shift>, C<unshift>, C<pop>, 
-C<push>, C<splice> or any other functions that are known to have a 
-sufficient ``impact" on contents of lists.
+The tied array is read-only.
 
 Files within the tied array are statically tied.
 
