@@ -16,7 +16,7 @@ SCRIPTS
 
 bin/mount.pl
 
-Interface to Tie::Mounted that ties a node.
+Ties a node.
 
 LICENSE
 

@@ -1,6 +1,6 @@
 package Tie::Mounted;
 
-$VERSION = '0.05';
+$VERSION = '0.06';
 
 use strict 'vars';
 use vars qw(
@@ -17,7 +17,7 @@ $UMOUNT_BIN = '/sbin/umount';
 
 sub _private {
     my $APPROVE = 1;
-    my @NODES   = qw(  );
+    my @NODES   = qw(    );
     
  
     return eval do { $_[0] };     
@@ -31,7 +31,7 @@ sub _private {
 
     # This is tricky since FETCHSIZE expects
     # the ``proper" array size. Its $# due
-    # to the hidden node.
+    # to the hidden node that is left out.
     sub FETCHSIZE { $#{$_[0]} }
     sub FETCH     { $_[0]->[++$_[1]] }
 
@@ -62,7 +62,7 @@ sub _approve {
 }
   
 sub _mount {
-    die '_mount is private' unless _localcall(1,59);
+    die '_mount is private' unless _localcall(1,61);
     my $node = shift;
     if (!_is_mounted($node)) {
         my $cmd = "$MOUNT_BIN @_ $node";
@@ -82,16 +82,16 @@ sub _is_mounted {
 
 sub _read_dir {
     my $node = shift;
-    local *D;
-    opendir D, $node
+    local *DIR;
+    opendir DIR, $node
       or die "Couldn't init access to $node: $!";
-    my @items = sort readdir D; splice(@items, 0, 2);
-    closedir D or die "Couldn't drop access to $node: $!";
+    my @items = sort readdir DIR; splice(@items, 0, 2);
+    closedir DIR or die "Couldn't drop access to $node: $!";
     return \@items;
 }
 
 sub _umount {
-    die '_umount is private' unless _localcall(1,59);
+    die '_umount is private' unless _localcall(1,61);
     my $node = shift;
     my $cmd = "$UMOUNT_BIN $node";
     system($cmd) == 0 or exit 1;
@@ -118,18 +118,18 @@ Tie::Mounted - Tie a mounted node to an array
 
  require Tie::Mounted;
 
- tie @items, 'Tie::Mounted', '/backup', '-v';
- print $items[-1];
- untie @items;
+ tie @files, 'Tie::Mounted', '/backup', '-v';
+ print $files[-1];
+ untie @files;
 
 =head1 DESCRIPTION
 
-This module ties files of a mount point to an array by invoking
-the system commands C<mount> and C<umount>; C<mount> is invoked
-when a former attempt to tie an array is being committed,
-C<umount> when a tied array is to be untied. Suitability 
-is therefore limited and suggests a rarely used node (such as
-F</backup>).
+This module ties files (and directories) of a mount point to an 
+array by invoking the system commands C<mount> and C<umount>; 
+C<mount> is invoked when a former attempt to tie an array is 
+being committed, C<umount> when a tied array is to be untied. 
+Suitability is therefore limited and suggests a rarely 
+used node (such as F</backup>).
 
 The mandatory parameter consists of the node (or: I<mount point>)
 to be mounted (F</backup> - as declared in F</etc/fstab>); 
@@ -137,12 +137,12 @@ optional options to C<mount> may be subsequently passed (-v).
 Device names and mount options (-a,-A,-d) will be discarded
 in regard of system security.
 
-Paths to C<mount> and C<umount> may be overriden by setting
-accordingly either $Tie::Mounted::MOUNT_BIN or 
+Default paths to C<mount> and C<umount> may be overriden
+by setting accordingly either $Tie::Mounted::MOUNT_BIN or 
 $Tie::Mounted::UMOUNT_BIN.
 
-If $Tie::Mounted::No_files is set to a true value, a bogus array 
-with zero files will be tied.
+If $Tie::Mounted::No_files is set to a true value, 
+a bogus array with zero files will be tied.
 
 =head1 CAVEATS
 

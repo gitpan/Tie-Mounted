@@ -8,7 +8,7 @@ use Tie::Mounted;
 
 my $node = '';
 
-tie my @mounted, 'Tie::Mounted', $node, '-v';
+tie my @files, 'Tie::Mounted', $node, '-v';
 $, = "\n";
-print @mounted; print "\n";
-untie @mounted;
+print @files; print "\n";
+untie @files;

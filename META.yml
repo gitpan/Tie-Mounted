@@ -7,4 +7,3 @@ requires:
 distribution_type: module
 license: perl
 dist_abstract: Tie a mounted node to an array
-dist_author: Steven Schubiger
