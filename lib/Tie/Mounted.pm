@@ -1,6 +1,6 @@
 package Tie::Mounted;
 
-$VERSION = '0.11';
+$VERSION = '0.13';
 
 use strict 'vars';
 use vars qw(
