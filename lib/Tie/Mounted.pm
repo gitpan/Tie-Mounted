@@ -1,16 +1,21 @@
 package Tie::Mounted;
 
-$VERSION = '0.14';
-
-use strict 'vars';
-use vars qw(
-    $FSTAB
-    $MOUNT_BIN 
-    $UMOUNT_BIN
-    $NO_FILES
-);
+use strict;
+use warnings;
 use base qw(Tie::Array);
-use Carp 'croak';
+
+use Carp ();
+use File::Which ();
+use IO::File ();
+use Symbol ();
+
+our ($VERSION,
+     $FSTAB,
+     $MOUNT_BIN,
+     $UMOUNT_BIN,
+     $NO_FILES);
+
+$VERSION = '0.15';
 
 
 $FSTAB      = '/etc/fstab';
@@ -19,48 +24,53 @@ $UMOUNT_BIN = '/sbin/umount';
 
 
 sub _private {
-    my $APPROVE = 1;
+    my $APPROVE = 0;
     my @NODES   = qw(    );
     
- 
     return eval do { $_[0] };     
 }
 
 {
     sub TIEARRAY {
-        (undef) = shift;
+        my $class = shift;
 	
+	_gather_paths();
 	_validate_node($_[0]);
 	
-        return bless &_tie;
+        return bless(&_tie, $class);
     }
 
     sub FETCHSIZE { $#{$_[0]} }           # FETCHSIZE, FETCH: Due to the node, 
     sub FETCH     { $_[0]->[++$_[1]] }    # which is being kept hideously, accordingly  
                                           # subtract (FETCHSIZE) or add (FETCH) 1.    
     *STORESIZE = *STORE = 
-      sub { croak 'Tied array is read-only' };
+      sub { Carp::croak 'Tied array is read-only' };
 
     sub UNTIE { _approve('umount', $_[0]->[0]) }
+}
+
+sub _gather_paths {
+    $MOUNT_BIN = File::Which::which('mount')
+      unless -e $MOUNT_BIN && -x $MOUNT_BIN;
+    $UMOUNT_BIN = File::Which::which('umount')
+      unless -e $UMOUNT_BIN && -x $UMOUNT_BIN;
 }
 
 sub _validate_node {
     my ($node) = @_;
     
-    local *F_TABS; 
-    
-    open F_TABS, "<$FSTAB" or die "Couldn't open $FSTAB: $!";
-    my $fstabs = do { local $/ = ''; <F_TABS> };
-    close F_TABS or die "Couldn't close $FSTAB: $!";
+    my $fh = IO::File->new("<$FSTAB") or die "Can't open $FSTAB for reading: $!";
+    my $fstabs = do { local $/ = ''; <$fh> };
+    $fh->close;
     
     !$node
-      ? croak 'No node supplied'
+      ? Carp::croak 'No node supplied'
       : !-d $node
-        ? croak "$node doesn't exist"
+        ? Carp::croak "$node doesn't exist"
         : $fstabs =~ /^\#.*$node/m
-          ? croak "$node is enlisted as disabled in $FSTAB"
+          ? Carp::croak "$node is enlisted as disabled in $FSTAB"
 	  : $fstabs !~ /$node/s
-	    ? croak "$node is not enlisted in $FSTAB"
+	    ? Carp::croak "$node is not enlisted in $FSTAB"
 	    : '';
 }
 
@@ -70,9 +80,7 @@ sub _tie {
     
     _approve('mount', $node, grep !/^-[aAd]$/o, @args);
     
-    my $items = $NO_FILES
-      ? []
-      : _read_dir($node); 
+    my $items = $NO_FILES ? [] : _read_dir($node); 
     
     # Invisible node at index 0
     unshift @$items, $node;
@@ -84,71 +92,59 @@ sub _approve {
     my ($sub, $node) = (shift, @_);
     
     if (_private('$APPROVE')) { 
-	croak "Attempt to $sub unapproved node" 
+	Carp::croak "Attempt to $sub unapproved node" 
 	  unless (grep { $node eq $_ } _private('@NODES')); 
     }
     
+    no strict 'refs';
     &{"_$sub"};
 }
       
 sub _mount {
-    die '_mount is private' unless _localcall(1,91);
-    
     my $node = shift;
     
     unless (_is_mounted($node)) {
         my $cmd = "$MOUNT_BIN @_ $node";
-        system $cmd == 0 or exit 1;
+        system($cmd) == 0 or exit(1);
     }
 }
 
 sub _is_mounted {
     my ($node) = @_;
     
-    open PIPE, "$MOUNT_BIN |" 
-      or die "Couldn't init pipe to $MOUNT_BIN: $!";
-      
-    my $ret = (grep /$node/, <PIPE>) ? 1 : 0;
+    my $pipe = Symbol::gensym();
     
-    close PIPE 
-      or die "Couldn't drop pipe to $MOUNT_BIN: $!";
+    open($pipe, "$MOUNT_BIN |") 
+      or die "Can't init pipe to $MOUNT_BIN: $!";
       
-    return $ret;
+    my $retval = (grep /$node/, <$pipe>) ? 1 : 0;
+    
+    close($pipe);
+      
+    return $retval;
 }
 
 sub _read_dir {
     my ($node) = @_;
     
-    local *DIR;
+    my $dh = Symbol::gensym();
     
-    opendir DIR, $node
-      or die "Couldn't init access to $node: $!";
+    opendir($dh, $node)
+      or die "Can't open directory $node: $!";
       
-    my @items = sort (readdir DIR); 
+    my @items = sort readdir($dh); 
     splice(@items, 0, 2);
     
-    closedir DIR
-      or die "Couldn't drop access to $node: $!";
+    closedir($dh);
     
     return \@items;
 }
 
 sub _umount {
-    die '_umount is private' unless _localcall(1,91);
-    
     my ($node) = @_;
     
     my $cmd = "$UMOUNT_BIN $node";
-    system $cmd == 0 or exit 1;
-}
-
-sub _localcall {
-    my @called = (caller(shift))[0,2];
-    
-    return $called[0] ne __PACKAGE__ 
-      ? 0
-      : (grep { $called[1] == $_ } @_)
-        ? 1 : 0;
+    system($cmd) == 0 or exit(1);
 }
 
 1;
@@ -160,7 +156,7 @@ Tie::Mounted - Tie a mounted node to an array
 
 =head1 SYNOPSIS
 
- require Tie::Mounted;
+ use Tie::Mounted;
 
  tie @files, 'Tie::Mounted', '/backup', '-v';
  print $files[-1];
@@ -177,37 +173,38 @@ used node (such as F</backup>).
 
 The mandatory parameter consists of the node (or: I<mount point>)
 to be mounted (F</backup> - as declared in F</etc/fstab>); 
-optional options to C<mount> may be subsequently passed (-v).
-Device names and mount options (-a,-A,-d) will be discarded
+optional options to C<mount> may be subsequently passed (C<-v>).
+Device names and mount options (C<-a,-A,-d>) will be discarded
 in regard of system security.
 
 Default paths to C<mount> and C<umount> may be overriden
-by setting accordingly either $Tie::Mounted::MOUNT_BIN or 
-$Tie::Mounted::UMOUNT_BIN.
+by setting accordingly either C<$Tie::Mounted::MOUNT_BIN> or 
+C<$Tie::Mounted::UMOUNT_BIN>. If either of them doesn't exist
+at the predefined path, a C<which()> will be performed to 
+determine the actual path. 
 
-If $Tie::Mounted::NO_FILES is set to a true value, 
+If C<$Tie::Mounted::NO_FILES> is set to a true value, 
 a bogus array with zero files will be tied.
 
 =head1 CAVEATS
 
 =head2 Security
 
-Tie::Mounted requires by default to either have $APPROVE
-set to an untrue value in order to pass nodes as desired, or 
-@NODES to contain the nodes that are considered ``approved";
-both variables are lexically scoped and adjustable within _private(). 
-If in approval mode and a node is passed that is considered
-unapproved, Tie::Mounted will throw an exception.
+C<Tie::Mounted> has by default set C<$APPROVE> to an untrue value in order 
+to allow all nodes to be passed. If C<$APPROVE> is set to a true value,
+C<@NODES> has to contain the nodes that are considered ``approved"; both 
+variables are lexically scoped and adjustable within C<_private()>. If in 
+approval mode and a node is passed that is considered unapproved, 
+C<Tie::Mounted> will throw an exception.
 
 Such ``security" is rather trivial; instead it is recommended 
 to adjust filesystem permissions to prevent malicious use.
 
 =head2 Portability
 
-It is doubted that it will work reliably on a non-(Open)BSD 
-system due to the fact that a pipe to mount has to be established to 
-ensure that a node is not already being mounted; which requires a 
-parameter to be passed that widely varies on common Unix systems.
+C<Tie::Mounted> is Linux/UNIX centered (due to the F<fstab> file & the 
+C<mount/umount> binaries requirements) and will most likely won't work
+on other platforms.
 
 =head2 Miscellanea
 
@@ -215,13 +212,19 @@ The tied array is read-only.
 
 Files within the tied array are statically tied.
 
-=head2 Internals
-
-It is not recommended to modify internals unless the parameters
-to _localcall() are being adjusted accordingly.
-
 =head1 SEE ALSO
 
 L<perlfunc/tie>, fstab(5), mount(8), umount(8)
+
+=head1 AUTHOR
+
+Steven Schubiger <schubiger@cpan.org>
+
+=head1 LICENSE
+
+This program is free software; you may redistribute it and/or 
+modify it under the same terms as Perl itself.
+
+See L<http://www.perl.com/perl/misc/Artistic.html>	    
 
 =cut
