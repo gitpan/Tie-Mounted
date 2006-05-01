@@ -1,5 +1,11 @@
 Revision history for Perl extension Tie::Mounted.
 
+0.16 Mon May  1 17:02:19 CEST 2006
+
+ - Extended the _gather_paths() function to croak
+   appropriately in case File::Which::which() fails
+   to find mount/umount.
+
 0.15 Sun Apr 30 17:38:31 CEST 2006
 
  - Removed the _locallcall() function, because we don't

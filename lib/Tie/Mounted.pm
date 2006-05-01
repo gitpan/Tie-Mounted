@@ -15,7 +15,7 @@ our ($VERSION,
      $UMOUNT_BIN,
      $NO_FILES);
 
-$VERSION = '0.15';
+$VERSION = '0.16';
 
 
 $FSTAB      = '/etc/fstab';
@@ -50,10 +50,22 @@ sub _private {
 }
 
 sub _gather_paths {
-    $MOUNT_BIN = File::Which::which('mount')
-      unless -e $MOUNT_BIN && -x $MOUNT_BIN;
-    $UMOUNT_BIN = File::Which::which('umount')
-      unless -e $UMOUNT_BIN && -x $UMOUNT_BIN;
+    unless (-e $MOUNT_BIN && -x $MOUNT_BIN) {
+        eval { require File::Basename };
+	die $@ if $@;
+        my $mount_which = File::Which::which('mount');
+	$mount_which
+	  ? $MOUNT_BIN = $mount_which
+	  : Carp::croak "Can't locate ", File::Basename::basename($MOUNT_BIN), ": $!";
+    }
+    unless (-e $UMOUNT_BIN && -x $UMOUNT_BIN) {
+        eval { require File::Basename };
+	die $@ if $@;
+        my $umount_which = File::Which::which('umount');
+	$umount_which
+	  ? $UMOUNT_BIN = $umount_which
+	  : Carp::croak "Can't locate ", File::Basename::basename($UMOUNT_BIN), ": $!";
+    }
 }
 
 sub _validate_node {
