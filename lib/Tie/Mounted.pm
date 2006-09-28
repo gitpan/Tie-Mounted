@@ -15,7 +15,7 @@ our ($VERSION,
      $UMOUNT_BIN,
      $NO_FILES);
 
-$VERSION = '0.16';
+$VERSION = '0.17';
 
 
 $FSTAB      = '/etc/fstab';
